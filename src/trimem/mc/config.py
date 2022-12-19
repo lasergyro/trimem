@@ -12,6 +12,9 @@ import os
 from .. import core as m
 
 CONF = """[GENERAL]
+# seed
+seed = 0
+
 # algorithm to run: 'hmc', 'minimize'
 algorithm = hmc
 

@@ -844,6 +844,7 @@ void expose_flips(py::module& m)
         py::arg("mesh"),
         py::arg("estore"),
         py::arg("flip_ratio"),
+        py::arg("seed"),
         R"pbdoc(
         Serial flip sweep.
 
@@ -857,6 +858,7 @@ void expose_flips(py::module& m)
                 combination with the ``mesh`` to evaluate energy differences
                 necessary for flip acceptance/rejection.
             flip_ratio (float): ratio of edges to test (must be in [0,1]).
+            seed (int) : seed for random number generator.
         )pbdoc"
     );
 
@@ -866,6 +868,7 @@ void expose_flips(py::module& m)
         py::arg("mesh"),
         py::arg("estore"),
         py::arg("flip_ratio"),
+        py::arg("seed"),
         R"pbdoc(
         Batch parallel flip sweep.
 
@@ -886,6 +889,7 @@ void expose_flips(py::module& m)
                 combination with the ``mesh`` to evaluate energy differences
                 necessary for flip acceptance/rejection.
             flip_ratio (float): ratio of edges to test (must be in [0,1]).
+            seed (int) : seed for random number generator.
         )pbdoc"
     );
 }

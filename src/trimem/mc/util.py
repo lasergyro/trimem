@@ -13,7 +13,7 @@ import numpy as np
 from scipy.optimize import minimize
 
 from .. import core as m
-from .hmc import MeshHMC, MeshFlips, MeshMonteCarlo, get_step_counters
+from .hmc import HMCOptions, MeshFlipOptions, MeshHMC, MeshFlips, MeshMonteCarlo, get_step_counters
 from .mesh import Mesh, read_trimesh
 from .config import update_config_defaults, config_to_params, print_config
 from .output import make_output, create_backup, \
@@ -199,34 +199,39 @@ def run_mc(mesh, estore, config):
         "write_cpt":    cpt_writer,
     }
     funcs = TimingEnergyEvaluators(mesh, estore, output, options)
+    gen = np.random.default_rng(seed=config['GENERAL'].getint('seed'))
 
     # setup hmc to sample vertex positions
     cmc  = config["HMC"]
-    options = {
-        "mass":                  cmc.getfloat("momentum_variance"),
-        "time_step":             cmc.getfloat("step_size"),
-        "num_integration_steps": cmc.getint("traj_steps"),
-        "initial_temperature":   cmc.getfloat("initial_temperature"),
-        "cooling_factor":        cmc.getfloat("cooling_factor"),
-        "cooling_start_step":    cmc.getint("start_cooling"),
-        "info_step":             config["GENERAL"].getint("info"),
-    }
-    hmc = MeshHMC(mesh, funcs.fun, funcs.grad, options=options)
+    options=HMCOptions(
+        mass=cmc.getfloat("momentum_variance"),
+        time_step=cmc.getfloat("step_size"),
+        num_integration_steps=cmc.getint("traj_steps"),
+        initial_temperature=cmc.getfloat("initial_temperature"),
+        cooling_factor=cmc.getfloat("cooling_factor"),
+        cooling_start_step=cmc.getint("start_cooling"),
+        info_step=config["GENERAL"].getint("info"),
+    )
+    hmc = MeshHMC(mesh, funcs.fun, funcs.grad, options=options,gen=gen)
 
-    # setup edge flips
-    options = {
-        "flip_type":  cmc["flip_type"],
-        "flip_ratio": cmc.getfloat("flip_ratio"),
-        "info_step":  config["GENERAL"].getint("info"),
-    }
-    flips = MeshFlips(mesh, estore, options=options)
+    # # setup edge flips
+    # options = {
+    #     "flip_type":  cmc["flip_type"],
+    #     "flip_ratio": cmc.getfloat("flip_ratio"),
+    #     "info_step":  config["GENERAL"].getint("info"),
+    # }
+    flips = MeshFlips(mesh, estore, options=MeshFlipOptions(
+        flip_type=cmc['flip_type'],
+        flip_ratio=cmc.getfloat("flip_ratio"),
+        info_step=config['GENERAL'].getint('info')
+        ),gen=gen)
 
     # initialize counters
     step_count = get_step_counters()
     step_count.update(json.loads(cmc.get("init_step")))
 
     # setup combined-step markov chain
-    mmc = MeshMonteCarlo(hmc, flips, step_count, callback=funcs.callback)
+    mmc = MeshMonteCarlo(hmc, flips, step_count, callback=funcs.callback,gen=gen)
 
     # run sampling 
     mmc.run(cmc.getint("num_steps"))

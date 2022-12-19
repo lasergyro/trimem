@@ -6,6 +6,7 @@ capable to integrate trimem-specific edge-flip functionality as flip
 proposals into the Monte Carlo framework.
 """
 
+from typing import Literal, Optional
 import numpy as np
 from collections import Counter
 
@@ -34,16 +35,38 @@ def get_step_counters():
     """
     return Counter(move=0, flip=0)
 
-_hmc_default_options = {
-    "mass":                  1.0,
-    "time_step":             1.0e-4,
-    "num_integration_steps": 100,
-    "initial_temperature":   1.0,
-    "minimal_temperature":   1.0e-6,
-    "cooling_factor":        0.0,
-    "cooling_start_step":    0,
-    "info_step":             100,
-}
+from dataclasses import dataclass,asdict
+def pprint_options(options):
+    width = max([len(str(k)) for k in options.__dataclass_fields__])
+    for k, v in asdict(options).items():
+        print(f"  {k: <{width}}: {v}")
+
+@dataclass(frozen=True)
+class HMCOptions:
+    """HMC options
+    * ``mass`` (default: 1.0): scaling factor for unit-diagonal mass
+              matrix used in the time integration
+    * ``time_step`` (default: 1.0e-4): time step for time integration
+    * ``num_integration_steps`` (default: 100): number of time
+        integration steps
+    * ``initial_temperature`` (default: 1.0): initial temperature for
+        simulated annealing
+    * ``minimal_temperature`` (default: 1.0e-6): minimal temperature
+        for annealing
+    * ``cooling_factor`` (default: 0.0): factor for exponential cooling
+    * ``cooling_start_step`` (default: 0): start simulated annealing
+        at this step
+    * ``info_step`` (default: 100): print info every n'th step
+    * ``init_step`` (default: 0): start value for step counter
+    """
+    mass : float =1.
+    time_step : float = 1e-4
+    num_integration_steps : int = 100
+    initial_temperature : float = 1.
+    minimal_temperature : float = 1e-6
+    cooling_factor : float = 0.
+    cooling_start_step : int = 0
+    info_step : int = 100
 
 class HMC:
     """Simple Hamiltonian Monte Carlo (with optional cooling).
@@ -62,22 +85,7 @@ class HMC:
     Keyword Args:
         callback (callable): step callback with signature callback(x)
             (defaults to no-op.)
-        options (dict-like): algorithm parametrization (optional):
-
-            * ``mass`` (default: 1.0): scaling factor for unit-diagonal mass
-              matrix used in the time integration
-            * ``time_step`` (default: 1.0e-4): time step for time integration
-            * ``num_integration_steps`` (default: 100): number of time
-              integration steps
-            * ``initial_temperature`` (default: 1.0): initial temperature for
-              simulated annealing
-            * ``minimal_temperature`` (default: 1.0e-6): minimal temperature
-              for annealing
-            * ``cooling_factor`` (default: 0.0): factor for exponential cooling
-            * ``cooling_start_step`` (default: 0): start simulated annealing
-              at this step
-            * ``info_step`` (default: 100): print info every n'th step
-            * ``init_step`` (default: 0): start value for step counter
+        options : HMCOptions
 
     """
 
@@ -88,32 +96,31 @@ class HMC:
         grad_nlog_prob,
         callback=None,
         counter=get_step_counters(),
-        options={},
+        options=HMCOptions(),
+        gen=None,
     ):
         """Initialization."""
-
+        self.gen=gen if gen is not None else np.random.default_rng()
         # function, gradient and callback evaluation
         self.nlog_prob      = nlog_prob
         self.grad_nlog_prob = grad_nlog_prob
         self.cb             = lambda x,s: None if callback is None else callback
 
         # init options
-        options    = {**_hmc_default_options, **options}
-        self.m     = options["mass"]
-        self.dt    = options["time_step"]
-        self.L     = options["num_integration_steps"]
-        self.Tinit = options["initial_temperature"]
-        self.Tmin  = options["minimal_temperature"]
-        self.fT    = options["cooling_factor"]
-        self.cN    = options["cooling_start_step"]
-        self.istep = options["info_step"]
+        self.m     = options.mass
+        self.dt    = options.time_step
+        self.L     = options.num_integration_steps
+        self.Tinit = options.initial_temperature
+        self.Tmin  = options.minimal_temperature
+        self.fT    = options.cooling_factor
+        self.cN    = options.cooling_start_step
+        self.istep = options.info_step
 
         # pretty print options
         print("\n---------------------------------------")
         print("Hamiltonian Monte Carlo Initialization:")
-        width = max([len(str(k)) for k in options.keys()])
-        for k, v in options.items():
-            print(f"  {k: <{width}}: {v}")
+        pprint_options(options)
+        
 
         # ref to step counters
         self.counter = counter
@@ -137,7 +144,7 @@ class HMC:
         p_var = self.m*self.T
 
         # sample momenta
-        p = np.random.normal(size=self.x.shape)*np.sqrt(p_var)
+        p = self.gen.normal(size=self.x.shape)*np.sqrt(p_var)
 
         # integrate trajectory
         force = lambda x: -self.grad_nlog_prob(x)
@@ -148,7 +155,7 @@ class HMC:
 
         # compute acceptance probability: min(1, np.exp(-de))
         a = 1.0 if dh<=0 else np.exp(-dh)
-        u = np.random.uniform()
+        u = self.gen.uniform()
         acc = u<=a
         if acc:
             self.x    = xn
@@ -214,16 +221,18 @@ class MeshHMC(HMC):
         grad_nlog_prob,
         callback=None,
         counter=get_step_counters(),
-        options={},
+        options=HMCOptions(),
+        gen=None,
     ):
         """Init."""
         super().__init__(
-            mesh.x,
-            nlog_prob,
-            grad_nlog_prob,
-            callback,
-            counter,
-            options
+            x=mesh.x,
+            nlog_prob=nlog_prob,
+            grad_nlog_prob=grad_nlog_prob,
+            callback=callback,
+            counter=counter,
+            options=options,
+            gen=gen,
         )
         self.mesh = mesh
 
@@ -233,11 +242,20 @@ class MeshHMC(HMC):
         self.mesh.x = self.x
 
 
-_mc_flip_default_options = {
-    "flip_type": "parallel",
-    "flip_ratio": 0.1,
-    "info_step":  100,
-}
+
+
+@dataclass(frozen=True)
+class MeshFlipOptions:
+    """
+    * ``flip_type`` (default: 'parallel'): 'serial' or 'parallel' flip evaluation
+    * ``flip_ration`` (default: 0.1): proportion of edges in the mesh
+        for which a flip is attempted
+    * ``info_step`` (default: 100): print info every n'th step
+    * ``init_step`` (default: 0): initial value for the step counter
+    """
+    flip_type : Literal['serial','parallel'] = 'parallel'
+    flip_ratio : float = .1
+    info_step : int = 100
 
 class MeshFlips:
     """Flipping edges as a step in a Markov Chain.
@@ -250,21 +268,17 @@ class MeshFlips:
         estore (EnergyManager): `backend` for performing flipping on edges.
 
     Keyword Args:
-        options (dict-like): flip parametrization (optional):
+        options : MeshFlipOptions
 
-            * ``flip_type`` (default: 'parallel'): 'serial' or 'parallel' flip
-              evaluation
-            * ``flip_ration`` (default: 0.1): proportion of edges in the mesh
-              for which a flip is attempted
-            * ``info_step`` (default: 100): print info every n'th step
-            * ``init_step`` (default: 0): initial value for the step counter
+            
     """
     def __init__(
         self,
         mesh,
         estore,
         counter=get_step_counters(),
-        options={}
+        options=MeshFlipOptions(),
+        gen=None,
     ):
         """Init."""
 
@@ -272,24 +286,25 @@ class MeshFlips:
         self.estore = estore
 
         # init options
-        options    = {**_mc_flip_default_options, **options}
-        self.istep = options["info_step"]
-        self.fr    = options["flip_ratio"]
-        self.ft    = options["flip_type"]
+        self.istep = options.info_step
+        self.fr    = options.flip_ratio
+        self.ft    = options.flip_type
+        self.gen=gen if gen is not None else np.random.default_rng()
+
 
         # pretty print options
         print("\n--------------------------------")
         print("Flips Monte Carlo Initialization:")
-        width = max([len(str(k)) for k in options.keys()])
-        for k, v in options.items():
-            print(f"  {k: <{width}}: {v}")
+        pprint_options(options)
 
         if self.ft == "none" or self.fr == 0.0:
             self._flips = lambda: 0
         elif self.ft == "serial":
-            self._flips = lambda: m.flip(self.mesh.trimesh, self.estore, self.fr)
+            self._flips = lambda: m.flip(
+                self.mesh.trimesh, self.estore, self.fr,self.gen.integers(0,high=np.iinfo(np.int32).max))
         elif self.ft == "parallel":
-            self._flips = lambda: m.pflip(self.mesh.trimesh, self.estore, self.fr)
+            self._flips = lambda: m.pflip(
+                self.mesh.trimesh, self.estore, self.fr,self.gen.integers(0,high=np.iinfo(np.int32).max))
         else:
             raise ValueError("Wrong flip-type: {}".format(self.ft))
 
@@ -344,9 +359,12 @@ class MeshMonteCarlo:
         hmc,
         flips,
         counter=get_step_counters(),
-        callback=None
+        callback=None,
+        gen=None,
     ):
         """Initialize."""
+        self.gen=gen if gen is not None else np.random.default_rng()
+
         self.hmc   = hmc
         self.flips = flips
         self.cb    = (lambda x, s: None) if callback is None else callback
@@ -358,7 +376,7 @@ class MeshMonteCarlo:
 
     def step(self):
         """Make one step each with each algorithm."""
-        if np.random.choice(2) == 0:
+        if self.gen.choice(2) == 0:
             self.hmc.step()
         else:
             self.flips.step()

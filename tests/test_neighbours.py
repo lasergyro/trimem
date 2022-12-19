@@ -6,7 +6,7 @@ import trimem.core as m
 from scipy.sparse import coo_matrix
 from scipy.spatial import KDTree
 
-from util import rect
+from .util import rect
 
 # -----------------------------------------------------------------------------
 #                                                                     pytest --

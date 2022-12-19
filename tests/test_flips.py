@@ -1,7 +1,7 @@
 import numpy as np
 import trimem.core as m
 
-from util import icosphere
+from .util import icosphere
 
 import pytest
 
@@ -55,6 +55,6 @@ def test_flips(params):
     estore = params.estore
     mesh   = params.mesh
 
-    acc = m.flip(mesh, estore, 0.5)
+    acc = m.flip(mesh, estore, 0.5, 0)
 
     assert acc > 100

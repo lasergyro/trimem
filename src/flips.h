@@ -12,8 +12,8 @@ namespace trimem {
 
 struct EnergyManager;
 
-int flip_serial(TriMesh& mesh, EnergyManager& estore, const real& flip_ratio);
+int flip_serial(TriMesh& mesh, EnergyManager& estore, const real& flip_ratio, int seed);
 
-int flip_parallel_batches(TriMesh& mesh, EnergyManager& estore, const real& flip_ratio);
+int flip_parallel_batches(TriMesh& mesh, EnergyManager& estore, const real& flip_ratio, int seed);
 }
 #endif

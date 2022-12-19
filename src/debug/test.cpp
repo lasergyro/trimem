@@ -62,7 +62,7 @@ int main(int argc, char* argv[])
 
     auto e = estore.energy(mesh);
     auto g = estore.gradient(mesh);
-    auto n = flip_serial(mesh, estore, 0.1);
+    auto n = flip_serial(mesh, estore, 0.1,0);
 
     auto N = g.size();
     std::cout << "Energy: " << e << "\n";

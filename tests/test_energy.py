@@ -3,8 +3,8 @@ from collections import namedtuple
 import trimem.core as m
 import numpy as np
 
-from util import icosphere
-from util import tube as tube_mesh
+from .util import icosphere
+from .util import tube as tube_mesh
 
 import pytest
 

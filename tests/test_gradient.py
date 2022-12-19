@@ -1,7 +1,7 @@
 import trimem.core as m
 import numpy as np
 
-from util import icosphere
+from .util import icosphere
 
 import pytest
 

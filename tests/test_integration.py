@@ -6,6 +6,7 @@ import trimesh
 import pytest
 
 CONF = """[GENERAL]
+seed = 0
 algorithm = {algorithm}
 info = 1
 ;input = inp.stl
@@ -104,6 +105,8 @@ def test_mcapp_config(iodir):
 
     # compare configs
     # (string comparison here enables readable output in case of failure)
+    print(config)
+    print(ref_config)
     assert config == ref_config
 
 def test_mcapp_min(iodir):
